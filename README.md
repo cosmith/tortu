@@ -1,9 +1,12 @@
-![tortu](./tortu-logo.png)
+![tortu](./img/tortu-logo.png)
 
 Tortu is an open source storyteller and music player for kids.
 
 It's also a work in progress :)
 
+Current state:
+
+![current state photo](./img/proto.jpg)
 
 # Todo
 
