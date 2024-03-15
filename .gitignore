@@ -1,0 +1,6 @@
+lib/
+*.uf2
+*.mp3
+.vscode
+*.zip
+.DS_Store
