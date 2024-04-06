@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp
-RUN pip install -U yt-dlp[default]
+RUN pip install -U yt-dlp[default] openai
 
 # Copy the Python script into the container
 COPY download.py .

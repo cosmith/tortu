@@ -12,13 +12,27 @@ import digitalio
 
 # -----------------------------------------------
 # Setup buttons
-play = digitalio.DigitalInOut(board.GP15)
-play.direction = digitalio.Direction.INPUT
-play.pull = digitalio.Pull.UP
 
-next = digitalio.DigitalInOut(board.GP14)
-next.direction = digitalio.Direction.INPUT
-next.pull = digitalio.Pull.UP
+
+btn_prev = digitalio.DigitalInOut(board.GP18)
+btn_prev.direction = digitalio.Direction.INPUT
+btn_prev.pull = digitalio.Pull.UP
+
+btn_play = digitalio.DigitalInOut(board.GP19)
+btn_play.direction = digitalio.Direction.INPUT
+btn_play.pull = digitalio.Pull.UP
+
+btn_music = digitalio.DigitalInOut(board.GP20)
+btn_music.direction = digitalio.Direction.INPUT
+btn_music.pull = digitalio.Pull.UP
+
+btn_story = digitalio.DigitalInOut(board.GP21)
+btn_story.direction = digitalio.Direction.INPUT
+btn_story.pull = digitalio.Pull.UP
+
+btn_next = digitalio.DigitalInOut(board.GP22)
+btn_next.direction = digitalio.Direction.INPUT
+btn_next.pull = digitalio.Pull.UP
 
 # -----------------------------------------------
 # Setup display
@@ -60,10 +74,19 @@ def setup_sdcard():
     storage.mount(vfs, "/sd")
 
 
-def play_mp3s():
+def get_mp3s(subpath):
     mp3s = sorted(
-        [f for f in os.listdir("/sd") if f.endswith(".mp3") and not f.startswith(".")]
+        [
+            f
+            for f in os.listdir(f"/sd/{subpath}")
+            if f.endswith(".mp3") and not f.startswith(".")
+        ]
     )
+    return mp3s
+
+
+def play_mp3s():
+    mp3s = get_mp3s("")
     show_text("Found " + str(len(mp3s)) + " mp3s")
     time.sleep(0.5)
 
@@ -81,7 +104,7 @@ def play_mp3s():
             now = time.monotonic()
 
             if (
-                not play.value
+                not btn_play.value
                 and audio.paused
                 and last_pause
                 and now - last_pause > 0.1
@@ -91,13 +114,13 @@ def play_mp3s():
                 show_text("Resumed")
                 last_pause = None
 
-            if not play.value and audio.playing:
+            if not btn_play.value and audio.playing:
                 audio.pause()
                 show_text("Paused")
                 last_pause = now
                 print(last_pause)
 
-            if not next.value and audio.playing:
+            if not btn_next.value and audio.playing:
                 audio.stop()
                 show_text("Stopped")
                 break
@@ -154,6 +177,16 @@ try:
     setup_sdcard()
     #    show_image("arbre.bmp")
     play_mp3s()
+
+#### buttons debug
+#    while True:
+#        show_text(f"""prev {btn_prev.value}
+# play {btn_play.value}
+# music {btn_music.value}
+# story {btn_story.value}
+# next {btn_next.value}""")
+####
+
 except Exception as e:
     show_text(str(e))
     time.sleep(1)
