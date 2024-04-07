@@ -1,6 +1,5 @@
 #include "SPI.h"
 #include <Arduino.h>
-#include <PNGdec.h>
 #include <TFT_eSPI.h>
 
 #include <SDFS.h>
@@ -10,29 +9,7 @@
 #include <AudioFileSourceBuffer.h>
 #include <AudioOutputI2S.h>
 
-#include "turtle.h"
-
-PNG png; // PNG decoder instance
-
-#define MAX_IMAGE_WIDTH 240 // Sets rendering line buffer lengths, adjust for your images
-
-TFT_eSPI tft = TFT_eSPI();
-
-// Position variables must be global (PNGdec does not handle position coordinates)
-int16_t xpos = 0;
-int16_t ypos = 0;
-
-void pngDraw(PNGDRAW *pDraw)
-{
-    uint16_t lineBuffer[MAX_IMAGE_WIDTH];
-    uint8_t pMask[40];
-
-    png.getLineAsRGB565(pDraw, lineBuffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-    if (png.getAlphaMask(pDraw, pMask, 200))
-    { // if any pixels are opaque, draw them
-        tft.pushMaskedImage(xpos, ypos + pDraw->y, pDraw->iWidth, 1, lineBuffer, pMask);
-    }
-}
+#include <Display.h>
 
 // SD card
 #define SD_SPI_CLK 10
@@ -40,12 +17,10 @@ void pngDraw(PNGDRAW *pDraw)
 #define SD_SPI_MISO 12
 #define SD_SPI_CS 13
 
-#define SD_SPI_FREQ 40000000
-
 // Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select
 // the highest speed supported by the board that is not over 4 MHz.
 // Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
-#define SPI_SPEED SD_SCK_MHZ(4)
+#define SPI_SPEED SD_SCK_MHZ(16)
 
 // Audio
 #define AUDIO_I2S_BCLK 0
@@ -57,10 +32,19 @@ AudioFileSourceBuffer *audioFileSourceBuffer;
 AudioFileSourceFS *audioFileSourceFS;
 AudioOutputI2S *audioOutput;
 
+enum State
+{
+    MENU,
+    PLAYING,
+    PAUSED,
+};
+
+State state = MENU;
+
 void setup()
 {
     Serial.begin(115200);
-    // delay(5000);
+    delay(5000);
     Serial.println("Welcome to Tortu :)");
 
     // Initialize SD card
@@ -88,10 +72,12 @@ void setup()
     }
 
     // Initialize audio I2S interface
-    const char *song = "/lion44-56mono.mp3";
+    const char *song = "/baila-44100-128-compressed.mp3";
 
-    audioOutput = new AudioOutputI2S();
+    audioOutput = new AudioOutputI2S(44100);
     audioOutput->SetPinout(AUDIO_I2S_BCLK, AUDIO_I2S_LRC, AUDIO_I2S_DOUT);
+    audioOutput->SetOutputModeMono(true);
+    audioOutput->SetGain(0.7);
 
     audioLogger = &Serial;
     audioFileSourceFS = new AudioFileSourceFS(SDFS, song);
@@ -106,10 +92,8 @@ void setup()
 
 void setup1()
 {
-    // Initialize the screen
-    tft.begin();
-    tft.setRotation(1);
-    tft.fillScreen(0x0000);
+    initializeDisplay();
+    displaySplash();
 }
 
 void loop()
@@ -130,30 +114,4 @@ void loop()
 
 void loop1()
 {
-    uint16_t pngw = 0, pngh = 0; // To store width and height of image
-
-    int16_t rc = png.openFLASH((uint8_t *)turtle, sizeof(turtle), pngDraw);
-
-    if (rc == PNG_SUCCESS)
-    {
-        Serial.println("Successfully opened png file");
-        pngw = png.getWidth();
-        pngh = png.getHeight();
-
-        tft.startWrite();
-        uint32_t dt = millis();
-        rc = png.decode(NULL, 0);
-        tft.endWrite();
-        Serial.print(millis() - dt);
-        Serial.println("ms");
-        tft.endWrite();
-
-        // png.close(); // Required for files, not needed for FLASH arrays
-    }
-
-    delay(100);
-
-    // Randomly change position
-    xpos = random(tft.width() - pngw);
-    ypos = random(tft.height() - pngh);
 }
