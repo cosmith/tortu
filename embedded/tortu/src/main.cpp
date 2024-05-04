@@ -10,6 +10,7 @@
 #include <AudioOutputI2S.h>
 
 #include <Display.h>
+#include <Button.h>
 
 // SD card
 #define SD_SPI_CLK 10
@@ -32,14 +33,36 @@ AudioFileSourceBuffer *audioFileSourceBuffer;
 AudioFileSourceFS *audioFileSourceFS;
 AudioOutputI2S *audioOutput;
 
-enum State
-{
-    MENU,
-    PLAYING,
-    PAUSED,
-};
+// Buttons
+Button buttonLeft(16);
+Button buttonPlay(22);
+Button buttonMusic(26);
+Button buttonStories(27);
+Button buttonRight(28);
 
 State state = MENU;
+
+void play(const char *filename)
+{
+    Serial.printf("MP3 play\n");
+    audioFileSourceFS = new AudioFileSourceFS(SDFS, filename);
+    audioGeneratorMP3 = new AudioGeneratorMP3();
+    audioGeneratorMP3->begin(audioFileSourceFS, audioOutput);
+    state = PLAYING;
+}
+
+void pause()
+{
+    Serial.printf("MP3 pause\n");
+    state = PAUSED;
+}
+
+void stop()
+{
+    Serial.printf("MP3 stop\n");
+    audioGeneratorMP3->stop();
+    state = MENU;
+}
 
 void setup()
 {
@@ -72,20 +95,18 @@ void setup()
     }
 
     // Initialize audio I2S interface
-    const char *song = "/baila-44100-128-compressed.mp3";
 
     audioOutput = new AudioOutputI2S(44100);
     audioOutput->SetPinout(AUDIO_I2S_BCLK, AUDIO_I2S_LRC, AUDIO_I2S_DOUT);
     audioOutput->SetOutputModeMono(true);
-    audioOutput->SetGain(0.7);
+    audioOutput->SetGain(1);
 
-    audioLogger = &Serial;
-    audioFileSourceFS = new AudioFileSourceFS(SDFS, song);
-
-    audioGeneratorMP3 = new AudioGeneratorMP3();
-
-    Serial.printf("BEGIN...\n");
-    audioGeneratorMP3->begin(audioFileSourceFS, audioOutput);
+    // Initialize buttons
+    buttonLeft.begin();
+    buttonPlay.begin();
+    buttonMusic.begin();
+    buttonStories.begin();
+    buttonRight.begin();
 
     Serial.println("\r\nInitialisation done.");
 }
@@ -98,20 +119,76 @@ void setup1()
 
 void loop()
 {
-    if (audioGeneratorMP3->isRunning())
+    bool playPressed = buttonPlay.pressed();
+    bool musicPressed = buttonMusic.pressed();
+    bool storiesPressed = buttonStories.pressed();
+    bool rightPressed = buttonRight.pressed();
+    bool leftPressed = buttonLeft.pressed();
+
+    bool playingAudio = false;
+
+    switch (state)
     {
-        if (!audioGeneratorMP3->loop())
+    case MENU:
+        delay(16);
+
+        if (playPressed)
         {
-            audioGeneratorMP3->stop();
+            play("/baila-44100-96-mono.mp3");
         }
-    }
-    else
-    {
-        Serial.printf("MP3 done\n");
-        delay(1000);
+
+        if (leftPressed)
+        {
+            play("/baila-44100-96-mono.mp3");
+        }
+
+        if (rightPressed)
+        {
+            play("/baila-44100-96-mono.mp3");
+        }
+        break;
+    case PLAYING:
+        playingAudio = audioGeneratorMP3->loop();
+
+        if (!playingAudio)
+        {
+            Serial.printf("Audio finished\n");
+            stop();
+        }
+        if (playPressed)
+        {
+            Serial.printf("Play pressed, pausing\n");
+            pause();
+        }
+        if (musicPressed || storiesPressed)
+        {
+            Serial.printf("Music/stories pressed, stopping\n");
+            stop();
+        }
+        break;
+    case PAUSED:
+        if (playPressed)
+        {
+            state = PLAYING;
+        }
+        if (musicPressed || storiesPressed)
+        {
+            Serial.printf("Music/stories pressed, stopping\n");
+            stop();
+        }
+        break;
     }
 }
 
 void loop1()
 {
+    bool left = buttonLeft.pressed();
+    bool play = buttonPlay.pressed();
+    bool music = buttonMusic.pressed();
+    bool stories = buttonStories.pressed();
+    bool right = buttonRight.pressed();
+
+    displayState(state);
+
+    delay(16);
 }

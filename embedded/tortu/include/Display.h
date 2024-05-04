@@ -1,5 +1,6 @@
 #include <TFT_eSPI.h>
 #include <PNGdec.h>
+#include <State.h>
 #include "TortuLogo.h"
 
 #define MAX_IMAGE_WIDTH 240 // Sets rendering line buffer lengths, adjust for your images
@@ -33,6 +34,8 @@ void initializeDisplay()
 
 void displaySplash()
 {
+    tft.fillScreen(TFT_BLACK);
+
     uint16_t pngw = 0, pngh = 0;
 
     ypos = 100;
@@ -49,5 +52,21 @@ void displaySplash()
         uint32_t dt = millis();
         rc = png.decode(NULL, 0);
         tft.endWrite();
+    }
+}
+
+void displayState(State state)
+{
+    switch (state)
+    {
+    case MENU:
+        displaySplash();
+        break;
+    case PLAYING:
+        tft.fillScreen(TFT_BLUE);
+        break;
+    case PAUSED:
+        tft.fillScreen(TFT_RED);
+        break;
     }
 }
