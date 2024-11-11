@@ -41,6 +41,7 @@ Button buttonStories(27);
 Button buttonRight(28);
 
 State state = MENU;
+State previousState = MENU;
 
 void play(const char *filename)
 {
@@ -108,6 +109,8 @@ void setup()
     buttonStories.begin();
     buttonRight.begin();
 
+    play("/lion44-96mono.mp3");
+
     Serial.println("\r\nInitialisation done.");
 }
 
@@ -134,17 +137,17 @@ void loop()
 
         if (playPressed)
         {
-            play("/baila-44100-96-mono.mp3");
+            play("/lion44-96mono.mp3");
         }
 
         if (leftPressed)
         {
-            play("/baila-44100-96-mono.mp3");
+            play("/lion44-96mono.mp3");
         }
 
         if (rightPressed)
         {
-            play("/baila-44100-96-mono.mp3");
+            play("/lion44-96mono.mp3");
         }
         break;
     case PLAYING:
@@ -188,7 +191,12 @@ void loop1()
     bool stories = buttonStories.pressed();
     bool right = buttonRight.pressed();
 
-    displayState(state);
+    if (previousState != state)
+    {
+        Serial.printf("State changed from %d to %d\n", previousState, state);
+        previousState = state;
+        displayState(state);
+    }
 
     delay(16);
 }
