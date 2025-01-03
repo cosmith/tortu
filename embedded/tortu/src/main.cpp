@@ -21,7 +21,7 @@
 // Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select
 // the highest speed supported by the board that is not over 4 MHz.
 // Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
-#define SPI_SPEED SD_SCK_MHZ(16)
+#define SPI_SPEED SD_SCK_MHZ(2)
 
 // Audio
 #define AUDIO_I2S_BCLK 0
@@ -69,16 +69,24 @@ void setup()
 {
     Serial.begin(115200);
     delay(5000);
-    Serial.println("Welcome to Tortu :)");
+    Serial.println("Serial started");
 
     // Initialize SD card
     SPI1.setRX(SD_SPI_MISO);
     SPI1.setTX(SD_SPI_MOSI);
     SPI1.setSCK(SD_SPI_CLK);
     SPI1.setCS(SD_SPI_CS);
+
+    Serial.println("SPI pins set");
+
     SDFSConfig sdFsConfig;
+    sdFsConfig.setSPISpeed(SPI_SPEED);
     sdFsConfig.setSPI(SPI1);
+
+    Serial.println("SDFS config set");
+
     SDFS.setConfig(sdFsConfig);
+
     bool sdInit = SDFS.begin();
     Serial.println(sdInit ? "SD card initialized" : "SD card initialization failed");
 
