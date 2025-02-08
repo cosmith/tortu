@@ -28,7 +28,7 @@ void pngDraw(PNGDRAW *pDraw)
 void initializeDisplay()
 {
     tft.begin();
-    tft.setRotation(3);
+    tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
 }
 
@@ -55,18 +55,33 @@ void displaySplash()
     }
 }
 
-void displayState(State state)
+void displayState(State state, MenuMode menuMode, JsonObject selectedItem)
 {
+    String name = selectedItem["name"];
+
     switch (state)
     {
-    case MENU:
+    case INITIALIZING:
         displaySplash();
         break;
+    case MENU:
+        tft.fillScreen(TFT_BLACK);
+        tft.drawString(name, 10, 50, 4);
+        break;
     case PLAYING:
-        tft.fillScreen(TFT_BLUE);
+        tft.fillScreen(TFT_BLACK);
+        tft.drawString("Playing", 10, 10, 4);
+        tft.drawString(name, 10, 50, 4);
         break;
     case PAUSED:
+        tft.fillScreen(TFT_BLACK);
+        tft.drawString("Paused", 10, 10, 4);
+        tft.drawString(name, 10, 50, 4);
+        break;
+    case ERROR:
         tft.fillScreen(TFT_RED);
+        tft.setTextColor(TFT_BLACK);
+        tft.drawString("Error", 10, 10, 4);
         break;
     }
 }

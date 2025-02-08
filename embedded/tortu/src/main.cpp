@@ -3,6 +3,7 @@
 #include <TFT_eSPI.h>
 
 #include <SDFS.h>
+#include <ArduinoJson.h>
 
 #include <AudioGeneratorMP3.h>
 #include <AudioFileSourceFS.h>
@@ -11,6 +12,7 @@
 
 #include <Display.h>
 #include <Button.h>
+#include <SDUtils.h>
 
 // SD card
 #define SD_SPI_CLK 10
@@ -21,12 +23,12 @@
 // Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select
 // the highest speed supported by the board that is not over 4 MHz.
 // Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
-#define SPI_SPEED SD_SCK_MHZ(2)
+#define SPI_SPEED SD_SCK_MHZ(10)
 
 // Audio
-#define AUDIO_I2S_BCLK 0
-#define AUDIO_I2S_LRC 1
-#define AUDIO_I2S_DOUT 2
+#define AUDIO_I2S_BCLK 7
+#define AUDIO_I2S_LRC 8
+#define AUDIO_I2S_DOUT 9
 
 AudioGeneratorMP3 *audioGeneratorMP3;
 AudioFileSourceBuffer *audioFileSourceBuffer;
@@ -40,13 +42,19 @@ Button buttonMusic(26);
 Button buttonStories(27);
 Button buttonRight(28);
 
-State state = MENU;
+// State management
+State state = INITIALIZING;
 State previousState = MENU;
+MenuMode menuMode = STORIES;
+MenuMode previousMenuMode = STORIES;
+int selectedItemIndex = 0;
+int previousSelectedItemIndex = 0;
+JsonDocument config;
 
-void play(const char *filename)
+void play(const char *path)
 {
-    Serial.printf("MP3 play\n");
-    audioFileSourceFS = new AudioFileSourceFS(SDFS, filename);
+    Serial.printf("Playing %s\n", path);
+    audioFileSourceFS = new AudioFileSourceFS(SDFS, path);
     audioGeneratorMP3 = new AudioGeneratorMP3();
     audioGeneratorMP3->begin(audioFileSourceFS, audioOutput);
     state = PLAYING;
@@ -63,6 +71,24 @@ void stop()
     Serial.printf("MP3 stop\n");
     audioGeneratorMP3->stop();
     state = MENU;
+}
+
+// String input;
+bool readConfig()
+{
+    File f = SDFS.open("/tortu.json", "r");
+    Serial.print(f.size());
+
+    DeserializationError error = deserializeJson(config, f);
+
+    if (error)
+    {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return false;
+    }
+
+    return true;
 }
 
 void setup()
@@ -91,16 +117,19 @@ void setup()
     Serial.println(sdInit ? "SD card initialized" : "SD card initialization failed");
 
     Dir dir = SDFS.openDir("/");
-    Serial.println("Files in /:");
+    Serial.print("Files in /: ");
     Serial.println(dir.next() ? "Yes" : "No");
-    while (dir.next())
+
+    // Start the recursive listing from the root directory
+    // Only for debugging purposes
+    // listDirectoryContents("/");
+
+    bool configOK = readConfig();
+
+    if (!configOK)
     {
-        Serial.print(dir.fileName() + " - ");
-        if (dir.fileSize())
-        {
-            File f = dir.openFile("r");
-            Serial.println(f.size());
-        }
+        state = ERROR;
+        return;
     }
 
     // Initialize audio I2S interface
@@ -117,8 +146,7 @@ void setup()
     buttonStories.begin();
     buttonRight.begin();
 
-    play("/lion44-96mono.mp3");
-
+    state = MENU;
     Serial.println("\r\nInitialisation done.");
 }
 
@@ -138,6 +166,9 @@ void loop()
 
     bool playingAudio = false;
 
+    String dir = menuMode == MUSIC ? "music" : "stories";
+    JsonObject selectedItem = config[dir][selectedItemIndex];
+
     switch (state)
     {
     case MENU:
@@ -145,46 +176,87 @@ void loop()
 
         if (playPressed)
         {
-            play("/lion44-96mono.mp3");
+            String path = "/" + dir + "/" + selectedItem["mp3"].as<String>();
+            play(path.c_str());
         }
 
         if (leftPressed)
         {
-            play("/lion44-96mono.mp3");
+            selectedItemIndex = (selectedItemIndex - 1) % config[dir].size();
         }
 
         if (rightPressed)
         {
-            play("/lion44-96mono.mp3");
+            selectedItemIndex = (selectedItemIndex + 1) % config[dir].size();
         }
+
+        if (storiesPressed && menuMode == MUSIC)
+        {
+            menuMode = STORIES;
+            selectedItemIndex = 0;
+        }
+
+        if (musicPressed && menuMode == STORIES)
+        {
+            menuMode = MUSIC;
+            selectedItemIndex = 0;
+        }
+
         break;
     case PLAYING:
         playingAudio = audioGeneratorMP3->loop();
 
         if (!playingAudio)
         {
-            Serial.printf("Audio finished\n");
+            Serial.println("Audio finished");
             stop();
         }
         if (playPressed)
         {
-            Serial.printf("Play pressed, pausing\n");
+            Serial.println("Play pressed, pausing");
             pause();
         }
-        if (musicPressed || storiesPressed)
+        if (musicPressed)
         {
-            Serial.printf("Music/stories pressed, stopping\n");
+            Serial.println("Music pressed, stopping");
             stop();
+            if (menuMode == STORIES)
+            {
+                menuMode = MUSIC;
+                selectedItemIndex = 0;
+            }
+        }
+        if (storiesPressed)
+        {
+            Serial.println("Stories pressed, stopping");
+            stop();
+            if (menuMode == MUSIC)
+            {
+                menuMode = STORIES;
+                selectedItemIndex = 0;
+            }
+        }
+        if (rightPressed)
+        {
+            stop();
+            selectedItemIndex = (selectedItemIndex + 1) % config[dir].size();
+        }
+        if (leftPressed)
+        {
+            stop();
+            selectedItemIndex = (selectedItemIndex - 1) % config[dir].size();
         }
         break;
     case PAUSED:
+        delay(16);
+
         if (playPressed)
         {
             state = PLAYING;
         }
         if (musicPressed || storiesPressed)
         {
-            Serial.printf("Music/stories pressed, stopping\n");
+            Serial.println("Music/stories pressed, stopping");
             stop();
         }
         break;
@@ -193,17 +265,16 @@ void loop()
 
 void loop1()
 {
-    bool left = buttonLeft.pressed();
-    bool play = buttonPlay.pressed();
-    bool music = buttonMusic.pressed();
-    bool stories = buttonStories.pressed();
-    bool right = buttonRight.pressed();
+    String dir = menuMode == MUSIC ? "music" : "stories";
+    JsonObject selectedItem = config[dir][selectedItemIndex];
 
-    if (previousState != state)
+    if (previousState != state || previousMenuMode != menuMode || previousSelectedItemIndex != selectedItemIndex)
     {
         Serial.printf("State changed from %d to %d\n", previousState, state);
         previousState = state;
-        displayState(state);
+        previousMenuMode = menuMode;
+        previousSelectedItemIndex = selectedItemIndex;
+        displayState(state, menuMode, selectedItem);
     }
 
     delay(16);
