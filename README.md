@@ -21,6 +21,6 @@ Current state:
 - [x] play sound
 - [x] display something on the screen
 - [ ] finalize design
-- [ ] implement music / story switch
-- [ ] add volume control
-- [ ] add 3.5mm jack output
+- [x] implement music / story switch
+- [x] add volume control
+- [x] add 3.5mm jack output
